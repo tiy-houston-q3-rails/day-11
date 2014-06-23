@@ -1,4 +1,5 @@
 require 'pry'
+require 'io/console'
 
 class Hand
   attr_accessor :cards
@@ -7,18 +8,34 @@ class Hand
     @cards = []
   end
 
-  def print_status
-    puts cards.map(&:display).join(", ")
-
+  def status
+    cards.map(&:display).join(", ")
   end
 
   def take_card(card)
     @cards << card
   end
+
+  def value
+    cards.map(&:value).inject(:+)
+  end
 end
 
+class DealerHand < Hand
+
+  def status(show_all_cards)
+    if show_all_cards
+      cards.map(&:display).join(", ")
+    else
+      "XX, #{cards.last.display}"
+    end
+  end
+
+end
 
 class Card
+  attr_reader :value
+
   def initialize suit, face, value
     @suit = suit
     @face = face
@@ -26,11 +43,12 @@ class Card
   end
 
   def display
-    [@face, print_suit(@suit)].join("")
+    [@face, suit_as_graphic].join("")
   end
 
-  def print_suit(suit)
-    {spades: "♤", clubs: "♧", hearts: "♡",diamonds: "♢"}[suit]
+  def suit_as_graphic
+    hash = {spades: "♤", clubs: "♧", hearts: "♡",diamonds: "♢"}
+    return hash[@suit]
   end
 end
 
@@ -73,13 +91,49 @@ class Blackjack
 
   def run_game
     @player_hand= Hand.new
-    @dealer_hand= Hand.new
+    @dealer_hand= DealerHand.new
     @deck = Deck.new
 
     deal(number_of_cards: 2, hand: @player_hand)
     deal(number_of_cards: 2, hand: @dealer_hand)
 
     show_hands
+
+    print_header
+
+    @player_can_hit = true
+    play_player
+    play_dealer
+
+    print_game_status
+
+  end
+
+  def player_has_not_busted
+    @player_can_hit and @player_hand.value < 21
+  end
+
+  def play_player
+    # First Loop -> Player
+    while player_has_not_busted?
+
+      if hit?
+        deal(number_of_cards: 1, hand: @player_hand)
+        show_hands
+      else
+        @player_can_hit = false
+      end
+    end
+
+  end
+
+
+  def play_dealer
+    @show_dealer_cards = true
+    # First Loop -> Dealer
+    while @dealer_hand.value < 16
+      deal(number_of_cards: 1, hand: @dealer_hand)
+    end
   end
 
   def deal(number_of_cards:, hand:)
@@ -89,10 +143,43 @@ class Blackjack
   end
 
   def show_hands
-    [player_hand, dealer_hand].each do |hand|
-      hand.print_status
+
+    puts "YOU: #{player_hand.status}"
+    puts "\n"
+    puts "THE DEALER: #{dealer_hand.status(@show_dealer_cards)}"
+    puts "\n\n"
+  end
+
+  def hit?
+    case STDIN.getch.downcase
+    when "h"
+      return true
+    when "s"
+      return false
+    when "q"
+      exit
+    else print_header
     end
   end
+
+  def print_header
+    10.times do
+      puts "\n"
+    end
+    puts "-------------------------------------"
+    puts "|      H for Hit, S for stand       |"
+    puts "-------------------------------------"
+    puts "\n"
+  end
+
+  def print_game_status
+    10.times do
+      puts "\n"
+    end
+    show_hands
+    puts "YOU: #{@player_hand.value} | DEALER: #{@dealer_hand.value}"
+  end
+
 end
 
 game = Blackjack.new
